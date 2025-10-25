@@ -1,0 +1,158 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>IPL Dashboard</title>
+  <script type="text/javascript" src="https://www.gstatic.com/charts/loader.js"></script>
+  <script>
+    google.charts.load('current', {packages: ['corechart', 'bar']});
+    google.charts.setOnLoadCallback(drawInitialCharts);
+
+    async function drawInitialCharts() {
+      const resp1 = await fetch('/api/matches-per-year/');
+      const data1 = await resp1.json();
+
+      const resp2 = await fetch('/api/matches-won/');
+      const data2 = await resp2.json();
+
+      drawMatchesPerYear(data1);
+      drawMatchesWon(data2);
+    }
+
+    function drawMatchesPerYear(data) {
+      const chartData = [['Year', 'Matches']];
+      data.forEach(d => chartData.push([d.season.toString(), d.matches]));
+      const dt = google.visualization.arrayToDataTable(chartData);
+      const chart = new google.visualization.ColumnChart(document.getElementById('matches_per_year'));
+      chart.draw(dt, {title: 'Matches per Year'});
+    }
+
+    function drawMatchesWon(data) {
+      const teamYears = {};
+      data.forEach(d => {
+        const season = String(d.season);
+        const winner = d.winner || "Unknown";
+        if (!teamYears[winner]) teamYears[winner] = {};
+        teamYears[winner][season] = d.wins;
+      });
+
+      const years = [...new Set(data.map(d => String(d.season)))].sort();
+      const chartData = [['Team', ...years]];
+      for (const team in teamYears) {
+        const row = [team];
+        years.forEach(y => row.push(teamYears[team][y] || 0));
+        chartData.push(row);
+      }
+
+      const dt = google.visualization.arrayToDataTable(chartData);
+      const chart = new google.visualization.BarChart(document.getElementById('matches_won'));
+      chart.draw(dt, {isStacked: true, title: 'Matches Won by Teams per Year'});
+    }
+
+    // ========== NEW CHARTS (Year-based) ==========
+
+    async function updateYearCharts() {
+      const year = document.getElementById("yearSelect").value;
+      if (!year) return;
+
+      const [extraResp, econResp, playedResp] = await Promise.all([
+        fetch(`/api/extra-runs/${year}/`),
+        fetch(`/api/economical-bowlers/${year}/`),
+        fetch(`/api/matches-played-won/${year}/`)
+      ]);
+
+      const [extraData, econData, playedData] = await Promise.all([
+        extraResp.json(),
+        econResp.json(),
+        playedResp.json()
+      ]);
+
+      drawExtraRuns(extraData, year);
+      drawEconomicalBowlers(econData, year);
+      drawMatchesPlayedVsWon(playedData, year);
+    }
+
+    function drawExtraRuns(data, year) {
+      const chartData = [['Team', 'Extra Runs']];
+      data.forEach(d => chartData.push([d.bowling_team, d.extra_runs]));
+      const dt = google.visualization.arrayToDataTable(chartData);
+      const chart = new google.visualization.ColumnChart(document.getElementById('extra_runs'));
+      chart.draw(dt, {title: `Extra Runs Conceded per Team - ${year}`});
+    }
+
+    function drawEconomicalBowlers(data, year) {
+      const chartData = [['Bowler', 'Economy']];
+      data.forEach(d => chartData.push([d.bowler, d.economy]));
+      const dt = google.visualization.arrayToDataTable(chartData);
+      const chart = new google.visualization.ColumnChart(document.getElementById('economical_bowlers'));
+      chart.draw(dt, {title: `Top Economical Bowlers - ${year}`});
+    }
+
+    function drawMatchesPlayedVsWon(data) {
+    // Convert both arrays to maps for easy lookup
+    console.log(data);
+    const playedMap = {};
+    data.played.forEach(d => playedMap[d.team1] = d.total);
+    const wonMap = {};
+    data.won.forEach(d => {
+    if(d.winner) wonMap[d.winner.trim()] = d.total;
+});
+
+    // Get unique set of teams from both lists
+    const allTeams = new Set([
+        ...Object.keys(playedMap),
+        ...Object.keys(wonMap)
+    ]);
+
+    // Prepare chart data: [Team, Matches Played, Matches Won]
+    const chartData = [['Team', 'Matches Played', 'Matches Won']];
+    allTeams.forEach(team => {
+        const played = playedMap[team] || 0;
+        const won = wonMap[team] || 0;
+        chartData.push([team, played, won]);
+    });
+
+    const dt = google.visualization.arrayToDataTable(chartData);
+    const chart = new google.visualization.ColumnChart(
+        document.getElementById('matches_played_won')
+    );
+
+    const options = {
+        title: 'Matches Played vs Matches Won per Team',
+        legend: { position: 'top' },
+        hAxis: { title: 'Team' },
+        vAxis: { title: 'Number of Matches' },
+        bar: { groupWidth: '75%' },
+        isStacked: false // side-by-side bars
+    };
+
+    chart.draw(dt, options);
+}
+  </script>
+</head>
+<body>
+  <h1>IPL Dashboard</h1>
+  <div id="matches_per_year" style="width: 100%; height: 500px;"></div>
+  <div id="matches_won" style="width: 100%; height: 500px;"></div>
+
+  <hr>
+  <h2>Year-wise Statistics</h2>
+  <label>Select Year:</label>
+  <select id="yearSelect" onchange="updateYearCharts()">
+    <option value="">--Select Year--</option>
+    <option>2008</option>
+    <option>2009</option>
+    <option>2010</option>
+    <option>2011</option>
+    <option>2012</option>
+    <option>2013</option>
+    <option>2014</option>
+    <option>2015</option>
+    <option>2016</option>
+    <option>2017</option>
+  </select>
+
+  <div id="extra_runs" style="width: 100%; height: 500px; margin-top: 30px;"></div>
+  <div id="economical_bowlers" style="width: 100%; height: 500px; margin-top: 30px;"></div>
+  <div id="matches_played_won" style="width: 100%; height: 500px; margin-top: 30px;"></div>
+</body>
+</html>

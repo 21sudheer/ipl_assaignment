@@ -1,0 +1,42 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <title>IPL Dashboard</title>
+    <script type="text/javascript" src="https://www.gstatic.com/charts/loader.js"></script>
+    <script type="text/javascript">
+      // Load Charts
+      google.charts.load('current', {'packages':['corechart']});
+      google.charts.setOnLoadCallback(drawCharts);
+
+      function drawCharts() {
+        // Matches per year
+        var data1 = new google.visualization.DataTable();
+        data1.addColumn('string', 'Season');
+        data1.addColumn('number', 'Matches');
+        var matches = {{ matches_per_year|safe }};
+        matches.forEach(m => data1.addRow([m.season.toString(), m.matches]));
+        var chart1 = new google.visualization.ColumnChart(document.getElementById('chart_matches'));
+        chart1.draw(data1, {title:'Matches per Year', width:600, height:400});
+
+        // Stacked bar chart: matches won
+        var data2 = new google.visualization.DataTable();
+        data2.addColumn('string', 'Season');
+        var teams = {{ teams|safe }};
+        teams.forEach(t => data2.addColumn('number', t));
+        var stacked = {{ stacked_data|safe }};
+        stacked.forEach(row => {
+          var r = [row.season.toString()];
+          teams.forEach(t => r.push(row[t] || 0));
+          data2.addRow(r);
+        });
+        var chart2 = new google.visualization.ColumnChart(document.getElementById('chart_wins'));
+        chart2.draw(data2, {title:'Matches Won per Team', width:800, height:500, isStacked:true});
+      }
+    </script>
+  </head>
+  <body>
+    <h1>IPL Dashboard</h1>
+    <div id="chart_matches"></div>
+    <div id="chart_wins"></div>
+  </body>
+</html>
